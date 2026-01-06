@@ -1,4 +1,6 @@
 site_name: CSE Notes
+site_url: https://utsavraithatha11.github.io/cse-notes/
+use_directory_urls: true
 theme:
   name: material
   palette:
