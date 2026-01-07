@@ -25,10 +25,105 @@ jobs:
         run: |
           pip install mkdocs mkdocs-material
 
+      - name: Process and rename markdown files
+        run: |
+          process_folder() {
+            folder="$1"
+            echo "Processing folder: $folder"
+            
+            for file in "$folder"/*.md; do
+              # Skip if no md files
+              [ -e "$file" ] || continue
+              
+              # Extract number and title
+              num=$(echo "$file" | sed -E 's#.*/([0-9]+).*#\1#')
+              title=$(basename "$file" | sed -E 's/^[0-9]+\)\s*//; s/\.md$//')
+              
+              # Capitalize for heading (convert first letter of each word to uppercase)
+              title_cap=$(echo "$title" | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) tolower(substr($i,2))}1')
+              
+              # Slug: lowercase + hyphens
+              slug=$(echo "$title" | tr 'A-Z' 'a-z' | sed -E 's/[^a-z0-9]+/-/g; s/^-|-$//g')
+              
+              # Zero-padded filename
+              num_pad=$(printf "%02d" "$num")
+              new_file="$folder/${num_pad}-${slug}.md"
+              
+              # Rename file
+              mv "$file" "$new_file"
+              
+              # Add title at top if not present
+              if ! grep -q "^# " "$new_file"; then
+                sed -i "1i# ${num}. ${title_cap}\n" "$new_file"
+              fi
+            done
+            
+            # Recurse into subfolders
+            for sub in "$folder"/*/; do
+              [ -d "$sub" ] && process_folder "$sub"
+            done
+          }
+          
+          # Start with docs
+          process_folder "docs"
+
       - name: Convert Obsidian image embeds
         run: |
           find docs -name "*.md" -exec \
           sed -i 's|!\[\[\(.*\)\]\]|![\1](attachments/\1)|g' {} +
+
+      - name: Convert tags to bullet format
+        run: |
+          find docs -name "*.md" -type f | while read file; do
+            awk '
+            /^## Tags/ {
+              print $0
+              in_tags_section = 1
+              tags_processed = 0
+              next
+            }
+            
+            in_tags_section && /^##/ {
+              in_tags_section = 0
+              print $0
+              next
+            }
+            
+            in_tags_section && !tags_processed && NF > 0 {
+              if ($0 ~ /#/) {
+                tags = $0
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", tags)
+                if (tags !~ /^-[[:space:]]+`#/) {
+                  print "- `" tags "`"
+                } else {
+                  print $0
+                }
+                tags_processed = 1
+                next
+              }
+            }
+            
+            in_tags_section && tags_processed && /^[[:space:]]*$/ {
+              print $0
+              next
+            }
+            
+            in_tags_section && tags_processed && NF > 0 && $0 ~ /#/ {
+              tags = $0
+              gsub(/^[[:space:]]+|[[:space:]]+$/, "", tags)
+              if (tags !~ /^-[[:space:]]+`#/) {
+                print "- `" tags "`"
+              } else {
+                print $0
+              }
+              next
+            }
+            
+            {
+              print $0
+            }
+            ' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+          done
 
       - name: Build site
         run: mkdocs build --clean
