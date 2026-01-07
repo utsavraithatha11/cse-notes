@@ -30,6 +30,59 @@ jobs:
           find docs -name "*.md" -exec \
           sed -i 's|!\[\[\(.*\)\]\]|![\1](attachments/\1)|g' {} +
 
+      - name: Convert tags to bullet format
+        run: |
+          find docs -name "*.md" -type f | while read file; do
+            awk '
+            /^## Tags/ {
+              print $0
+              in_tags_section = 1
+              tags_processed = 0
+              next
+            }
+            
+            in_tags_section && /^##/ {
+              in_tags_section = 0
+              print $0
+              next
+            }
+            
+            in_tags_section && !tags_processed && NF > 0 {
+              if ($0 ~ /#/) {
+                tags = $0
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", tags)
+                if (tags !~ /^-[[:space:]]+`#/) {
+                  print "- `" tags "`"
+                } else {
+                  print $0
+                }
+                tags_processed = 1
+                next
+              }
+            }
+            
+            in_tags_section && tags_processed && /^[[:space:]]*$/ {
+              print $0
+              next
+            }
+            
+            in_tags_section && tags_processed && NF > 0 && $0 ~ /#/ {
+              tags = $0
+              gsub(/^[[:space:]]+|[[:space:]]+$/, "", tags)
+              if (tags !~ /^-[[:space:]]+`#/) {
+                print "- `" tags "`"
+              } else {
+                print $0
+              }
+              next
+            }
+            
+            {
+              print $0
+            }
+            ' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+          done
+
       - name: Build site
         run: mkdocs build --clean
 
