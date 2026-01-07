@@ -31,9 +31,10 @@ jobs:
             folder="$1"
             echo "Processing folder: $folder"
             
-            for file in "$folder"/*.md; do
-              # Skip if no md files
-              [ -e "$file" ] || continue
+            # Find all .md files recursively from this folder
+            find "$folder" -type f -name "*.md" | while read file; do
+              # Get the directory containing this file
+              file_dir=$(dirname "$file")
               
               # Extract number and title
               num=$(echo "$file" | sed -E 's#.*/([0-9]+).*#\1#')
@@ -47,7 +48,7 @@ jobs:
               
               # Zero-padded filename
               num_pad=$(printf "%02d" "$num")
-              new_file="$folder/${num_pad}-${slug}.md"
+              new_file="$file_dir/${num_pad}-${slug}.md"
               
               # Rename file
               mv "$file" "$new_file"
@@ -56,11 +57,6 @@ jobs:
               if ! grep -q "^# " "$new_file"; then
                 sed -i "1i# ${num}. ${title_cap}\n" "$new_file"
               fi
-            done
-            
-            # Recurse into subfolders
-            for sub in "$folder"/*/; do
-              [ -d "$sub" ] && process_folder "$sub"
             done
           }
           
