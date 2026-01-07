@@ -27,41 +27,37 @@ jobs:
 
       - name: Process and rename markdown files
         run: |
-          process_folder() {
-            folder="$1"
-            echo "Processing folder: $folder"
+          # Find all .md files recursively and process them
+          while IFS= read -r -d '' file; do
+            echo "Processing file: $file"
             
-            # Find all .md files recursively from this folder
-            find "$folder" -type f -name "*.md" | while read file; do
-              # Get the directory containing this file
-              file_dir=$(dirname "$file")
-              
-              # Extract number and title
-              num=$(echo "$file" | sed -E 's#.*/([0-9]+).*#\1#')
-              title=$(basename "$file" | sed -E 's/^[0-9]+\)\s*//; s/\.md$//')
-              
-              # Capitalize for heading (convert first letter of each word to uppercase)
-              title_cap=$(echo "$title" | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) tolower(substr($i,2))}1')
-              
-              # Slug: lowercase + hyphens
-              slug=$(echo "$title" | tr 'A-Z' 'a-z' | sed -E 's/[^a-z0-9]+/-/g; s/^-|-$//g')
-              
-              # Zero-padded filename
-              num_pad=$(printf "%02d" "$num")
-              new_file="$file_dir/${num_pad}-${slug}.md"
-              
-              # Rename file
-              mv "$file" "$new_file"
-              
-              # Add title at top if not present
-              if ! grep -q "^# " "$new_file"; then
-                sed -i "1i# ${num}. ${title_cap}\n" "$new_file"
-              fi
-            done
-          }
-          
-          # Start with docs
-          process_folder "docs"
+            # Get the directory containing this file
+            file_dir=$(dirname "$file")
+            
+            # Extract number and title
+            num=$(echo "$file" | sed -E 's#.*/([0-9]+).*#\1#')
+            title=$(basename "$file" | sed -E 's/^[0-9]+\)\s*//; s/\.md$//')
+            
+            # Capitalize for heading (convert first letter of each word to uppercase)
+            title_cap=$(echo "$title" | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) tolower(substr($i,2))}1')
+            
+            # Slug: lowercase + hyphens
+            slug=$(echo "$title" | tr 'A-Z' 'a-z' | sed -E 's/[^a-z0-9]+/-/g; s/^-|-$//g')
+            
+            # Zero-padded filename
+            num_pad=$(printf "%02d" "$num")
+            new_file="$file_dir/${num_pad}-${slug}.md"
+            
+            # Rename file
+            mv "$file" "$new_file"
+            echo "Renamed to: $new_file"
+            
+            # Add title at top if not present
+            if ! grep -q "^# " "$new_file"; then
+              sed -i "1i# ${num}. ${title_cap}\n" "$new_file"
+              echo "Added title to: $new_file"
+            fi
+          done < <(find docs -type f -name "*.md" -print0)
 
       - name: Convert Obsidian image embeds
         run: |
